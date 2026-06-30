@@ -1,0 +1,115 @@
+name: ci-cd
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/vaultapi
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+      - name: terraform fmt
+        run: terraform -chdir=terraform fmt -check -recursive
+      - name: terraform init
+        run: terraform -chdir=terraform init -backend=false
+      - name: terraform validate
+        run: terraform -chdir=terraform validate
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Smoke test
+        run: |
+          python app/app.py &
+          sleep 2
+          curl -sf http://localhost:8080/health | grep -q ok
+          echo "Smoke test OK"
+
+  build-scan-push:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: table
+          exit-code: "0"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Push to GHCR
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:latest
+
+  terraform:
+    needs: [build-scan-push]
+    runs-on: ubuntu-latest
+    services:
+      localstack:
+        image: localstack/localstack:3
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: s3,dynamodb,sqs,iam,sts,ec2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+
+      - name: Wait for LocalStack
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4566/_localstack/health && break
+            sleep 2
+          done
+
+      - name: terraform init
+        run: terraform -chdir=terraform init -input=false
+
+      - name: terraform plan
+        run: terraform -chdir=terraform plan -input=false -out=tfplan
+
+      - name: terraform apply
+        if: github.ref == 'refs/heads/main'
+        run: terraform -chdir=terraform apply -input=false -auto-approve tfplan
