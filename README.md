@@ -75,10 +75,10 @@ bash scripts/destroy.sh
 
 Every push / PR to `main` runs four chained jobs:
 
-1. **lint** — `terraform fmt -check` and `terraform validate`
-2. **test** — start the app and smoke test `/health`
-3. **build-scan-push** — build the Docker image, scan it with Trivy (CRITICAL/HIGH), push to GHCR (main only)
-4. **terraform** — spin up LocalStack as a service and run `terraform plan/apply`
+1. **lint** - `terraform fmt -check` and `terraform validate`
+2. **test** - start the app and smoke test `/health`
+3. **build-scan-push** - build the Docker image, scan it with Trivy (CRITICAL/HIGH), push to GHCR (main only)
+4. **terraform** - spin up LocalStack as a service and run `terraform plan/apply`
 
 To fail the build on vulnerabilities, change `exit-code: "0"` to `"1"` in the Trivy step.
 
@@ -99,9 +99,9 @@ To fail the build on vulnerabilities, change `exit-code: "0"` to `"1"` in the Tr
 
 ```
 iac-cloud-pipeline/
-├── app/                      — placeholder service + Dockerfile
+├── app/                      - placeholder service + Dockerfile
 ├── terraform/
-│   ├── main.tf               — AWS provider pointed at LocalStack
+│   ├── main.tf               - AWS provider pointed at LocalStack
 │   ├── variables.tf
 │   ├── outputs.tf
 │   ├── s3.tf
@@ -109,9 +109,9 @@ iac-cloud-pipeline/
 │   ├── sqs.tf
 │   ├── iam.tf
 │   └── vpc.tf
-├── scripts/                  — localstack-up, deploy, validate, destroy
+├── scripts/                  - localstack-up, deploy, validate, destroy
 ├── .github/workflows/ci-cd.yml
-├── docker-compose.yml        — app + LocalStack
+├── docker-compose.yml        - app + LocalStack
 ├── Makefile
 └── README.md
 ```
