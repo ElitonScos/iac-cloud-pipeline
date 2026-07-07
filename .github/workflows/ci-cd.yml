@@ -11,7 +11,9 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/vaultapi
+  # GHCR requires the repository path to be lowercase; the owner login
+  # (ElitonScos) contains uppercase, so it is hardcoded lowercase here.
+  IMAGE_NAME: ghcr.io/elitonscos/vaultapi
 
 jobs:
   lint:
